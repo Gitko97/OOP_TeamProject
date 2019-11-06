@@ -43,7 +43,7 @@ D3DXMATRIX g_mProj;
 #define PI 3.14159265
 #define M_HEIGHT 0.01
 #define DECREASE_RATE 0.9982
-const float holePos[6][2] = { {-4.5 + H_RADIUS,3- H_RADIUS},{-4.5 + H_RADIUS,-3+H_RADIUS},{0,3}, {0,-3}, {4.5 - H_RADIUS,3 - H_RADIUS},{4.5 - H_RADIUS,-3 + H_RADIUS} };
+const float holePos[6][2] = { {-4.5 + H_RADIUS,3 - H_RADIUS},{-4.5 + H_RADIUS,-3 + H_RADIUS},{0,3}, {0,-3}, {4.5 - H_RADIUS,3 - H_RADIUS},{4.5 - H_RADIUS,-3 + H_RADIUS} };
 // -----------------------------------------------------------------------------
 // CSphere class definition
 // -----------------------------------------------------------------------------
@@ -134,7 +134,6 @@ public :
 	}
 };
 
-PlayerTurn* playerturn = new PlayerTurn();
 class Text {////https://m.blog.naver.com/PostView.nhn?blogId=woocom2&logNo=90043358245&proxyReferer=https%3A%2F%2Fwww.google.com%2 //참조
 private:
 	float					center_x, center_z;
@@ -277,30 +276,62 @@ public:
 	
     bool hasIntersected(CSphere& ball) 
 	{
-		// Insert your code here.
+		D3DXVECTOR3 targetPos = ball.getCenter();
+		D3DXVECTOR3 thisPos = this->getCenter();
 
+		if (sqrt(pow(targetPos.x - thisPos.x, 2) + pow(targetPos.z - thisPos.z, 2)) < M_RADIUS * 2) {	//등호를 넣을까 말까
+			//충돌한 걸 풀어주기 좌표가 겹친걸 다시 되돌리기...
+			return true;
+		}
 		return false;
 	}
 	
 	void hitBy(CSphere& ball) //this랑 ball이 충돌
 	{
-		D3DXVECTOR3 targetpos = ball.getCenter();
-		D3DXVECTOR3	whitepos = this->getCenter();
-		double x = this->getVelocity_X();
-		double z = this->getVelocity_Z();
-		if (sqrt(pow(targetpos.x - whitepos.x, 2) + pow(targetpos.z - whitepos.z, 2)) <=M_RADIUS*2 ) {
-			double theta = acos(sqrt(pow(targetpos.x - whitepos.x, 2)) / sqrt(pow(targetpos.x - whitepos.x, 2) +
-				pow(targetpos.z - whitepos.z, 2)));		// 기본 1 사분면
-			if (targetpos.z - whitepos.z <= 0 && targetpos.x - whitepos.x >= 0) { theta = -theta; }	//4 사분면
-			if (targetpos.z - whitepos.z >= 0 && targetpos.x - whitepos.x <= 0) { theta = PI - theta; } //2 사분면
-			if (targetpos.z - whitepos.z <= 0 && targetpos.x - whitepos.x <= 0) { theta = PI + theta; } // 3 사분면
-			double changeX = cos(theta) * this->getVelocity_X() ? cos(theta) * this->getVelocity_X() : 0.1;
-			double changeZ = sin(theta) * this->getVelocity_Z() ? sin(theta) * this->getVelocity_Z() : 0.1;
-			ball.setPower( changeX, changeZ);
-			changeX = (cos(90 / 3.14 - theta) * x - sin(90 - theta) * z) * 3 / 4 ? (cos(90 / 3.14 - theta) * x - sin(90 - theta) * z) * 3 / 4 : 0.1;
-			changeZ = (cos(90 / 3.14 - theta) * z + sin(90 - theta) * x) * 3 / 4 ? (cos(90 / 3.14 - theta) * z + sin(90 - theta) * x) * 3 / 4 : 0.1;
-			this->setPower(changeX,changeZ );
+		if (hasIntersected(ball)) {
+			D3DXVECTOR3 avec, a1, a2;
+
+			float dest;	//충돌 방향의 단위 벡터 연산
+			const D3DXVECTOR3 centVec = ball.getCenter() - this->getCenter();
+			dest = D3DXVec3Length(&centVec);
+			avec = (ball.getCenter() - this->getCenter()) / dest;
+
+			//공 O1, O2의 속도 벡터 V1, V2의 충돌 방향 벡터 연산
+			D3DXVECTOR3 v1 = { (float)this->getVelocity_X(), (float)0.0, (float)this->getVelocity_Z() };
+			D3DXVECTOR3 v2 = { (float)ball.getVelocity_X(), (float)0.0, (float)ball.getVelocity_Z() };
+			a1 = (D3DXVec3Dot(&avec, &v1) * avec);	//내적 (라디안 값)
+			a2 = (D3DXVec3Dot(&avec, &v2) * avec);	//내적
+
+													//V1*avec와 V2*avec를 교체
+			this->setPower(v1 - a1 + a2);
+			ball.setPower(v2 - a2 + a1);
+
+
+			//공을 떼어놓는다
+			if (this->getPower() > ball.getPower()) {
+				this->moveCenter((2 * this->getRadius() - dest) * -1 * avec);
+			}
+			else {
+				ball.moveCenter((2 * this->getRadius() - dest) * 1 * avec);
+			}
+
+
 		}
+	}
+
+	void moveCenter(D3DXVECTOR3 vel) {
+		D3DXVECTOR3 temp = this->getCenter() + vel;
+		this->setCenter(temp.x, temp.y, temp.z);
+	}
+
+	void setPower(D3DXVECTOR3 input)
+	{
+		this->m_velocity_x = input.x;
+		this->m_velocity_z = input.z;
+	}
+
+	float getPower() {
+		return m_velocity_x * m_velocity_x + m_velocity_z * m_velocity_z;
 	}
 
 	void ballUpdate(float timeDiff) 
@@ -356,7 +387,6 @@ private:
     ID3DXMesh*              m_pSphereMesh;
 	
 };
-
 class CHole {
 private:
 	float					center_x, center_y, center_z;
@@ -429,7 +459,7 @@ public:
 	{///3차원 공간사이에 두점사이의 거리와 피타고라스 이용(구멍의 둘레 위에 ball의 중심이오면 골인!)
 		if (hasIntersected(ball)) {
 			ball.setPower(0, 0);
-			ball.setCenter(-20.0f, (float)M_RADIUS, -20.0f);
+			ball.setCenter(-100.0f, -(float)M_RADIUS, -100.0f);
 			ball.setball_goal(true); //공을 떨어진걸로 초기화
 			return true;
 		}
@@ -455,7 +485,6 @@ private:
 // -----------------------------------------------------------------------------
 // CWall class definition
 // -----------------------------------------------------------------------------
-
 
 class CWall {
 
@@ -515,31 +544,43 @@ public:
 	
 	bool hasIntersected(CSphere& ball) 
 	{
-		// Insert your code here.
-		return false;
-	}
+		D3DXVECTOR3 targetPos = ball.getCenter();
+
+		//if문 4개 각각 4면의 벽에 닿으면 true 아니면 false
+		if (targetPos.x - M_RADIUS <= -4.5)
+			return true;
+		else if (targetPos.x + M_RADIUS >= 4.5)
+			return true;
+		else if (targetPos.z - M_RADIUS <= -3)
+			return true;
+		else if (targetPos.z + M_RADIUS >= 3)
+			return true;
+
+		else
+			return false;
+	}//없어도 됨
 
 	void hitBy(CSphere& ball) // ball이랑 벽 부딪힘
 	{
 		D3DXVECTOR3	whitepos = ball.getCenter();
-		if (whitepos.x >= (4.5 - M_RADIUS))
-		{
-			ball.setCenter(4.5-M_RADIUS,whitepos.y,whitepos.z);
-			ball.setPower(-ball.getVelocity_X()*4/5, ball.getVelocity_Z() * 4 / 5); //부딫혔을때 백터 크기 줄이기
+
+		if (whitepos.x + M_RADIUS >= 4.5) {
+			ball.setCenter(4.5 - M_RADIUS, whitepos.y, whitepos.z);
+			ball.setPower(-ball.getVelocity_X() * DECREASE_RATE, ball.getVelocity_Z() * DECREASE_RATE);
 		}
-		else if (whitepos.x <= (-4.5 + M_RADIUS)) {
+		else if (whitepos.x - M_RADIUS <= -4.5) {
 			ball.setCenter(-4.5 + M_RADIUS, whitepos.y, whitepos.z);
-			ball.setPower(-ball.getVelocity_X() * 4/5, ball.getVelocity_Z() * 4 / 5);
+			ball.setPower(-ball.getVelocity_X() * DECREASE_RATE, ball.getVelocity_Z() * DECREASE_RATE);
 		}
-		else if (whitepos.z <= (-3 + M_RADIUS)) {
-			ball.setCenter(whitepos.x, whitepos.y, -3+M_RADIUS);
-			ball.setPower(ball.getVelocity_X() * 4 / 5, -ball.getVelocity_Z()*4 / 5);
+		else if (whitepos.z - M_RADIUS <= -3) {
+			ball.setCenter(whitepos.x, whitepos.y, -3 + M_RADIUS);
+			ball.setPower(ball.getVelocity_X() * DECREASE_RATE, -ball.getVelocity_Z() * DECREASE_RATE);
 		}
-		else if (whitepos.z >= (3 - M_RADIUS)) {
+		else if (whitepos.z + M_RADIUS >= 3) {
 			ball.setCenter(whitepos.x, whitepos.y, 3 - M_RADIUS);
-			ball.setPower(ball.getVelocity_X() * 4 / 5, -ball.getVelocity_Z() * 4 / 5);
+			ball.setPower(ball.getVelocity_X() * DECREASE_RATE, -ball.getVelocity_Z() * DECREASE_RATE);
 		}
-		
+
 	}    
 	
 	void setPosition(float x, float y, float z)
@@ -661,7 +702,7 @@ CSphere	g_sphere[numberOfBall];
 CSphere	g_target_blueball;
 CLight	g_light;
 Text g_text[7];
-
+PlayerTurn* playerturn = new PlayerTurn();
 // -----------------------------------------------------------------------------
 // Functions
 // -----------------------------------------------------------------------------
