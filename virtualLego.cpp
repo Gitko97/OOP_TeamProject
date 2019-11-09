@@ -274,15 +274,14 @@ public:
 		m_pSphereMesh->DrawSubset(0);
     }
 	
+
     bool hasIntersected(CSphere& ball) 
 	{
 		D3DXVECTOR3 targetPos = ball.getCenter();
 		D3DXVECTOR3 thisPos = this->getCenter();
 
-		if (sqrt(pow(targetPos.x - thisPos.x, 2) + pow(targetPos.z - thisPos.z, 2)) < M_RADIUS * 2) {	//등호를 넣을까 말까
-			//충돌한 걸 풀어주기 좌표가 겹친걸 다시 되돌리기...
+		if (sqrt(pow(targetPos.x - thisPos.x, 2) + pow(targetPos.z - thisPos.z, 2)) < M_RADIUS * 2) //중심과 중심 사이 거리가 지름보다 작을때 겹친다
 			return true;
-		}
 		return false;
 	}
 	
@@ -291,20 +290,41 @@ public:
 		if (hasIntersected(ball)) {
 			D3DXVECTOR3 avec, a1, a2;
 
-			float dest;	//충돌 방향의 단위 벡터 연산
+			float dest;
 			const D3DXVECTOR3 centVec = ball.getCenter() - this->getCenter();
 			dest = D3DXVec3Length(&centVec);
-			avec = (ball.getCenter() - this->getCenter()) / dest;
+			avec = (centVec) / dest;
+			//avec는 충돌 방향의 단위 벡터 입니다
+			//벡터끼리 빼준 뒤, 단위벡터로 만들어주기위해 길이(dest)만큼 나눈거에요
 
-			//공 O1, O2의 속도 벡터 V1, V2의 충돌 방향 벡터 연산
+
+			//공1은 this, 공 2는 ball입니다
 			D3DXVECTOR3 v1 = { (float)this->getVelocity_X(), (float)0.0, (float)this->getVelocity_Z() };
 			D3DXVECTOR3 v2 = { (float)ball.getVelocity_X(), (float)0.0, (float)ball.getVelocity_Z() };
-			a1 = (D3DXVec3Dot(&avec, &v1) * avec);	//내적 (라디안 값)
-			a2 = (D3DXVec3Dot(&avec, &v2) * avec);	//내적
+			//v1, v2는 저희가 속도는 따로 벡터값으로 안해뒀어서 값 얻어서 벡터로만 만든거에요
 
-													//V1*avec와 V2*avec를 교체
-			this->setPower(v1 - a1 + a2);
-			ball.setPower(v2 - a2 + a1);
+
+
+			//공 1, 2의 속도 벡터 v1, v2의 충돌 방향 벡터 연산
+			a1 = (D3DXVec3Dot(&avec, &v1) * avec);	//내적(라디안 값)
+			a2 = (D3DXVec3Dot(&avec, &v2) * avec);
+			//내적을 이용해 속도 벡터를 분해합니다
+			//D3DXVec3Dot는 이미 존재하는 벡터 내적 함수입니다
+			//아까 구했던 충돌방향단위벡터(avec)에 속도벡터(각각 v1, v2)를 내적해주고, avec를 다시 곱해줍니다
+			//벡터를 내적하면 그 두 벡터가 이루는 각과 벡터의 길이에 대한 스칼라 값이 나옵니다
+			
+			/*
+			참고 : 벡터 내적 구하는 방법
+			1. 각 성분을 곱한 값들을 더한다.
+			2. 두 벡터의 길이와 두 벡터가 이루는 각의 cos값을 곱한다.
+			*/
+
+			//avec를 다시 곱해주는 이유는 내적한 결과 값은 스칼라이기 때문에 충돌 방향과 평행하게 벡터를 곱해주는 거
+
+
+			//v1*avec와 v2*avec를 서로 바꿔준다
+			this->setPower(v1 - a1 + a2);	//this의 원래 속도 벡터에서 충돌방향에 해당하는 부분 벡터를 ball의 것과 교체
+			ball.setPower(v2 - a2 + a1);	//ball의 원래 속도 벡터에서 충돌방향에 해당하는 부분 벡터를 this의 것과 교체
 
 
 			//공을 떼어놓는다
@@ -314,23 +334,24 @@ public:
 			else {
 				ball.moveCenter((2 * this->getRadius() - dest) * 1 * avec);
 			}
-
-
+			//여기서 getPower()의 값은 vx의 제곱 + vz의 제곱이다
+			//그러므로 방향과 상관없이 속도의 절댓값이 크면(더 빠르게 운동하고 있었다면) power값이 클 것이다
+			//power값이 큰 sphere의 중점을 그 sphere가 운동해오던 방향의 뒤로 옮겨준다 (충돌에서 좌표 겹친 걸 풀어줌)
 		}
 	}
 
-	void moveCenter(D3DXVECTOR3 vel) {
+	void moveCenter(D3DXVECTOR3 vel) {	//원래의 중점을 나타내는 벡터에 input 벡터 값인 vel 만큼 더해준 값을 중점으로 지정
 		D3DXVECTOR3 temp = this->getCenter() + vel;
 		this->setCenter(temp.x, temp.y, temp.z);
 	}
 
-	void setPower(D3DXVECTOR3 input)
+	void setPower(D3DXVECTOR3 input)	//vx와 vz를 지정
 	{
 		this->m_velocity_x = input.x;
 		this->m_velocity_z = input.z;
 	}
 
-	float getPower() {
+	float getPower() {	//vx의 제곱 + vz의 제곱을 리턴
 		return m_velocity_x * m_velocity_x + m_velocity_z * m_velocity_z;
 	}
 
